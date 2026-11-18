@@ -10,9 +10,16 @@ import java.util.Random;
 import java.util.Set;
 
 public class SnakeGame {
-    public static final int INITIAL_TICK_MS = 125;
-    public static final int MIN_TICK_MS = 65;
-    public static final int SPEED_STEP_MS = 3;
+    public enum State {
+        MENU,
+        PLAYING,
+        PAUSED,
+        GAME_OVER
+    }
+
+    public static final int GOLDEN_SPAWN_INTERVAL = 5;
+    public static final int GOLDEN_FOOD_TICKS = 35;
+    public static final int GOLDEN_FOOD_POINTS = 3;
 
     private final int cols;
     private final int rows;
@@ -22,13 +29,19 @@ public class SnakeGame {
     private final Set<GridPoint> occupied = new HashSet<>();
     private final Deque<Direction> directionQueue = new ArrayDeque<>();
 
+    private GameMode gameMode = GameMode.INFINITE;
+    private Difficulty difficulty = Difficulty.NORMAL;
+    private State state = State.MENU;
+
     private Direction currentDirection;
     private GridPoint food;
+    private GridPoint goldenFood;
+    private int goldenFoodTicksLeft;
+
     private int score;
+    private int normalApplesEaten;
     private int highScore;
     private boolean newRecord;
-    private boolean paused;
-    private boolean gameOver;
     private boolean won;
 
     public SnakeGame(int cols, int rows) {
@@ -44,29 +57,56 @@ public class SnakeGame {
         this.rows = rows;
         this.highScore = Math.max(0, initialHighScore);
         this.random = random;
-        reset();
+        initBoard();
+        this.state = State.MENU;
     }
 
-    public void reset() {
+    private void initBoard() {
         snake.clear();
         occupied.clear();
         directionQueue.clear();
 
         currentDirection = Direction.RIGHT;
         score = 0;
+        normalApplesEaten = 0;
         newRecord = false;
-        paused = false;
-        gameOver = false;
         won = false;
+        goldenFood = null;
+        goldenFoodTicksLeft = 0;
 
         int startX = cols / 2;
         int startY = rows / 2;
-        // Cabeza primero, luego el cuerpo hacia la izquierda
         addSegmentAtTail(new GridPoint(startX, startY));
         addSegmentAtTail(new GridPoint(startX - 1, startY));
         addSegmentAtTail(new GridPoint(startX - 2, startY));
 
         spawnFood();
+    }
+
+    public void startGame() {
+        initBoard();
+        state = State.PLAYING;
+    }
+
+    public void reset() {
+        startGame();
+    }
+
+    public void returnToMenu() {
+        initBoard();
+        state = State.MENU;
+    }
+
+    public void setGameMode(GameMode gameMode) {
+        if (gameMode != null) {
+            this.gameMode = gameMode;
+        }
+    }
+
+    public void setDifficulty(Difficulty difficulty) {
+        if (difficulty != null) {
+            this.difficulty = difficulty;
+        }
     }
 
     private void addSegmentAtTail(GridPoint point) {
@@ -75,8 +115,10 @@ public class SnakeGame {
     }
 
     public void togglePause() {
-        if (!gameOver) {
-            paused = !paused;
+        if (state == State.PLAYING) {
+            state = State.PAUSED;
+        } else if (state == State.PAUSED) {
+            state = State.PLAYING;
         }
     }
 
@@ -85,7 +127,7 @@ public class SnakeGame {
      * (por ejemplo Arriba + Izquierda) se sientan fluidos y nunca giren 180°.
      */
     public void queueDirection(Direction newDirection) {
-        if (gameOver || paused || newDirection == null || directionQueue.size() >= 2) {
+        if (state != State.PLAYING || newDirection == null || directionQueue.size() >= 2) {
             return;
         }
         Direction reference = directionQueue.isEmpty() ? currentDirection : directionQueue.peekLast();
@@ -95,11 +137,11 @@ public class SnakeGame {
     }
 
     /**
-     * Avanza un paso (tick) en el juego.
+     * Avanza un paso (tick) en el juego y devuelve un TickEvent con lo ocurrido.
      */
-    public void update() {
-        if (gameOver || paused) {
-            return;
+    public TickEvent update() {
+        if (state != State.PLAYING) {
+            return TickEvent.NONE;
         }
 
         if (!directionQueue.isEmpty()) {
@@ -108,67 +150,123 @@ public class SnakeGame {
 
         GridPoint head = snake.peekFirst();
         GridPoint rawNext = head.translate(currentDirection);
+        GridPoint next;
 
-        // Bordes infinitos: al salir por un lado, aparece por el opuesto
-        GridPoint next = new GridPoint(
-                Math.floorMod(rawNext.x(), cols),
-                Math.floorMod(rawNext.y(), rows)
-        );
+        if (gameMode.wrapsWalls()) {
+            next = new GridPoint(
+                    Math.floorMod(rawNext.x(), cols),
+                    Math.floorMod(rawNext.y(), rows)
+            );
+        } else {
+            if (rawNext.x() < 0 || rawNext.x() >= cols || rawNext.y() < 0 || rawNext.y() >= rows) {
+                state = State.GAME_OVER;
+                return new TickEvent(false, false, null, false, true, false);
+            }
+            next = rawNext;
+        }
 
-        boolean willEat = next.equals(food);
+        boolean willEatNormal = next.equals(food);
+        boolean willEatGolden = next.equals(goldenFood);
+        boolean willGrow = willEatNormal || willEatGolden;
 
-        // Si NO come, liberamos la cola antes de verificar colisiones:
+        // Si NO crece, liberamos la cola antes de verificar colisiones:
         // así es válido moverse a la celda que la cola acaba de desocupar.
-        if (!willEat) {
+        if (!willGrow) {
             GridPoint tail = snake.removeLast();
             occupied.remove(tail);
         }
 
         if (occupied.contains(next)) {
-            gameOver = true;
-            return;
+            state = State.GAME_OVER;
+            return new TickEvent(false, false, null, false, true, false);
         }
 
         snake.addFirst(next);
         occupied.add(next);
 
-        if (willEat) {
-            score++;
-            if (score > highScore) {
-                highScore = score;
-                newRecord = true;
+        boolean goldenSpawned = false;
+
+        if (willEatGolden) {
+            goldenFood = null;
+            goldenFoodTicksLeft = 0;
+            addScore(GOLDEN_FOOD_POINTS);
+        } else if (goldenFood != null) {
+            goldenFoodTicksLeft--;
+            if (goldenFoodTicksLeft <= 0) {
+                goldenFood = null;
+                goldenFoodTicksLeft = 0;
             }
+        }
+
+        if (willEatNormal) {
+            normalApplesEaten++;
+            addScore(1);
             spawnFood();
+
+            if (state == State.PLAYING
+                    && goldenFood == null
+                    && normalApplesEaten % GOLDEN_SPAWN_INTERVAL == 0) {
+                goldenSpawned = spawnGoldenFood();
+            }
+        }
+
+        boolean ended = state == State.GAME_OVER;
+        return new TickEvent(
+                willEatNormal,
+                willEatGolden,
+                willGrow ? next : null,
+                goldenSpawned,
+                ended && !won,
+                ended && won
+        );
+    }
+
+    private void addScore(int points) {
+        score += points;
+        if (score > highScore) {
+            highScore = score;
+            newRecord = true;
         }
     }
 
     private void spawnFood() {
+        List<GridPoint> freeCells = collectFreeCells(goldenFood);
+        if (freeCells.isEmpty()) {
+            food = null;
+            goldenFood = null;
+            goldenFoodTicksLeft = 0;
+            won = true;
+            state = State.GAME_OVER;
+            return;
+        }
+        food = freeCells.get(random.nextInt(freeCells.size()));
+    }
+
+    private boolean spawnGoldenFood() {
+        List<GridPoint> freeCells = collectFreeCells(food);
+        if (freeCells.isEmpty()) {
+            return false;
+        }
+        goldenFood = freeCells.get(random.nextInt(freeCells.size()));
+        goldenFoodTicksLeft = GOLDEN_FOOD_TICKS;
+        return true;
+    }
+
+    private List<GridPoint> collectFreeCells(GridPoint extraExcluded) {
         List<GridPoint> freeCells = new ArrayList<>();
         for (int y = 0; y < rows; y++) {
             for (int x = 0; x < cols; x++) {
                 GridPoint cell = new GridPoint(x, y);
-                if (!occupied.contains(cell)) {
+                if (!occupied.contains(cell) && !cell.equals(extraExcluded)) {
                     freeCells.add(cell);
                 }
             }
         }
-
-        if (freeCells.isEmpty()) {
-            food = null;
-            won = true;
-            gameOver = true;
-            return;
-        }
-
-        food = freeCells.get(random.nextInt(freeCells.size()));
+        return freeCells;
     }
 
-    /**
-     * Calcula el intervalo entre ticks en milisegundos.
-     * Acelera suavemente conforme aumenta el puntaje hasta un mínimo cómodo.
-     */
     public int getTickDelayMs() {
-        return Math.max(MIN_TICK_MS, INITIAL_TICK_MS - score * SPEED_STEP_MS);
+        return difficulty.tickDelayForScore(score);
     }
 
     public Iterable<GridPoint> getSnake() {
@@ -187,6 +285,14 @@ public class SnakeGame {
         return food;
     }
 
+    public GridPoint getGoldenFood() {
+        return goldenFood;
+    }
+
+    public int getGoldenFoodTicksLeft() {
+        return goldenFoodTicksLeft;
+    }
+
     public int getScore() {
         return score;
     }
@@ -199,12 +305,28 @@ public class SnakeGame {
         return newRecord;
     }
 
+    public GameMode getGameMode() {
+        return gameMode;
+    }
+
+    public Difficulty getDifficulty() {
+        return difficulty;
+    }
+
+    public State getState() {
+        return state;
+    }
+
+    public boolean isInMenu() {
+        return state == State.MENU;
+    }
+
     public boolean isPaused() {
-        return paused;
+        return state == State.PAUSED;
     }
 
     public boolean isGameOver() {
-        return gameOver;
+        return state == State.GAME_OVER;
     }
 
     public boolean isWon() {
