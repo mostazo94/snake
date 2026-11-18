@@ -22,6 +22,7 @@ public class SnakeGameTest {
         testGoldenAppleSpawnsRewardsThreePointsAndExpires();
         testSelfCollisionAndResetPreservesHighScore();
         testDifficultySpeedOrdering();
+        testThemesCycleCleanly();
         testHighScoreStorageRoundTrip();
 
         System.out.println("Todas las pruebas pasaron correctamente (" + passed + " tests).");
@@ -247,6 +248,20 @@ public class SnakeGameTest {
                 "Normal debe ser más lento que Difícil");
         assertEquals(Difficulty.HARD.minTickMs(), Difficulty.HARD.tickDelayForScore(500),
                 "La velocidad debe respetarse con tope en minTickMs");
+        passed++;
+    }
+
+    private static void testThemesCycleCleanly() {
+        GameTheme first = GameTheme.CLASSIC_GREEN;
+        GameTheme current = first;
+        for (int i = 0; i < GameTheme.values().length; i++) {
+            assertTrue(current.label() != null && !current.label().isBlank(), "Cada tema debe tener etiqueta");
+            assertTrue(current.bg() != null && current.snakeHead() != null && current.food() != null,
+                    "Cada tema debe definir sus colores principales");
+            assertEquals(current, current.next().previous(), "next() y previous() deben ser inversos");
+            current = current.next();
+        }
+        assertEquals(first, current, "Recorrer todos los temas debe volver al inicial");
         passed++;
     }
 

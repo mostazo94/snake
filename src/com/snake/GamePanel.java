@@ -32,54 +32,25 @@ public class GamePanel extends JPanel {
     private static final int BOARD_WIDTH = COLS * TILE_SIZE;
     private static final int BOARD_HEIGHT = ROWS * TILE_SIZE;
 
-    private static final Color BG_COLOR = new Color(18, 22, 28);
-    private static final Color HUD_BG_COLOR = new Color(13, 17, 23);
-    private static final Color HUD_BORDER_COLOR = new Color(45, 55, 72);
-    private static final Color CLASSIC_WALL_COLOR = new Color(239, 68, 68, 170);
-    private static final Color GRID_COLOR = new Color(30, 37, 46);
-    private static final Color TEXT_PRIMARY = new Color(241, 245, 249);
-    private static final Color TEXT_MUTED = new Color(148, 163, 184);
-    private static final Color RECORD_GOLD = new Color(250, 204, 21);
-
-    private static final Color SNAKE_HEAD_COLOR = new Color(74, 222, 128);
-    private static final Color SNAKE_DEAD_HEAD_COLOR = new Color(248, 113, 113);
-    private static final Color SNAKE_BODY_START = new Color(34, 197, 94);
-    private static final Color SNAKE_BODY_END = new Color(21, 128, 61);
-    private static final Color EYE_COLOR = new Color(15, 23, 42);
-
-    private static final Color FOOD_COLOR = new Color(239, 68, 68);
-    private static final Color FOOD_HIGHLIGHT = new Color(252, 165, 165);
-    private static final Color FOOD_LEAF_COLOR = new Color(74, 222, 128);
-
-    private static final Color GOLDEN_COLOR = new Color(250, 204, 21);
-    private static final Color GOLDEN_HIGHLIGHT = new Color(254, 249, 195);
-    private static final Color GOLDEN_GLOW = new Color(250, 204, 21, 70);
-
-    private static final Color OVERLAY_BACKDROP = new Color(10, 14, 20, 190);
-    private static final Color OVERLAY_CARD_BG = new Color(24, 31, 42, 245);
-    private static final Color OVERLAY_CARD_BORDER = new Color(71, 85, 105);
-    private static final Color ROW_SELECTED_BG = new Color(36, 48, 66);
-    private static final Color BUTTON_GREEN = new Color(34, 197, 94);
-    private static final Color BUTTON_GREEN_HOVER = new Color(74, 222, 128);
-
     private static final Font HUD_FONT = new Font("SansSerif", Font.BOLD, 16);
     private static final Font HUD_META_FONT = new Font("SansSerif", Font.PLAIN, 12);
     private static final Font TITLE_FONT = new Font("SansSerif", Font.BOLD, 34);
     private static final Font OVERLAY_TITLE_FONT = new Font("SansSerif", Font.BOLD, 28);
     private static final Font OVERLAY_SUBTITLE_FONT = new Font("SansSerif", Font.PLAIN, 15);
     private static final Font MENU_LABEL_FONT = new Font("SansSerif", Font.PLAIN, 15);
-    private static final Font MENU_VALUE_FONT = new Font("SansSerif", Font.BOLD, 15);
+    private static final Font MENU_VALUE_FONT = new Font("SansSerif", Font.BOLD, 14);
     private static final Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 16);
     private static final Font POPUP_FONT = new Font("SansSerif", Font.BOLD, 14);
 
     // Rectángulos clicables del menú (en coordenadas del tablero)
-    private static final int MENU_CARD_W = 390;
-    private static final int MENU_CARD_H = 310;
+    private static final int MENU_CARD_W = 410;
+    private static final int MENU_CARD_H = 362;
     private static final int MENU_CARD_X = (BOARD_WIDTH - MENU_CARD_W) / 2;
     private static final int MENU_CARD_Y = (BOARD_HEIGHT - MENU_CARD_H) / 2;
-    private static final Rectangle MODE_ROW_RECT = new Rectangle(MENU_CARD_X + 26, MENU_CARD_Y + 104, MENU_CARD_W - 52, 42);
-    private static final Rectangle DIFF_ROW_RECT = new Rectangle(MENU_CARD_X + 26, MENU_CARD_Y + 156, MENU_CARD_W - 52, 42);
-    private static final Rectangle PLAY_BTN_RECT = new Rectangle(MENU_CARD_X + 95, MENU_CARD_Y + 220, MENU_CARD_W - 190, 42);
+    private static final Rectangle MODE_ROW_RECT = new Rectangle(MENU_CARD_X + 26, MENU_CARD_Y + 100, MENU_CARD_W - 52, 42);
+    private static final Rectangle DIFF_ROW_RECT = new Rectangle(MENU_CARD_X + 26, MENU_CARD_Y + 150, MENU_CARD_W - 52, 42);
+    private static final Rectangle THEME_ROW_RECT = new Rectangle(MENU_CARD_X + 26, MENU_CARD_Y + 200, MENU_CARD_W - 52, 42);
+    private static final Rectangle PLAY_BTN_RECT = new Rectangle(MENU_CARD_X + 105, MENU_CARD_Y + 264, MENU_CARD_W - 210, 44);
 
     private final HighScoreStorage highScoreStorage;
     private final SoundEffects soundEffects;
@@ -90,8 +61,9 @@ public class GamePanel extends JPanel {
     private final List<Particle> particles = new ArrayList<>();
     private final List<FloatingText> floatingTexts = new ArrayList<>();
 
+    private GameTheme theme = GameTheme.CLASSIC_GREEN;
     private int savedHighScore;
-    private int menuSelectedRow = 0; // 0 = Modo, 1 = Dificultad, 2 = Jugar
+    private int menuSelectedRow = 0; // 0 = Modo, 1 = Dificultad, 2 = Tema, 3 = Jugar
     private boolean playButtonHovered = false;
     private long lastFrameNanos;
     private double stepAccumulatorMs = 0.0;
@@ -104,7 +76,7 @@ public class GamePanel extends JPanel {
         this.game = new SnakeGame(COLS, ROWS, savedHighScore);
 
         setPreferredSize(new Dimension(BOARD_WIDTH, BOARD_HEIGHT + HUD_HEIGHT));
-        setBackground(BG_COLOR);
+        setBackground(theme.bg());
         setFocusable(true);
 
         addKeyListener(new KeyAdapter() {
@@ -133,6 +105,11 @@ public class GamePanel extends JPanel {
         this.frameTimer.start();
     }
 
+    private void setTheme(GameTheme newTheme) {
+        this.theme = newTheme;
+        setBackground(theme.bg());
+    }
+
     private void onFrame() {
         long now = System.nanoTime();
         double dtMs = Math.min(100.0, (now - lastFrameNanos) / 1_000_000.0);
@@ -158,13 +135,13 @@ public class GamePanel extends JPanel {
 
     private void handleTickEvent(TickEvent event) {
         if (event.ateFood() && event.eatenAt() != null) {
-            spawnParticles(event.eatenAt(), FOOD_COLOR, FOOD_HIGHLIGHT, 12);
-            spawnFloatingText(event.eatenAt(), "+1", TEXT_PRIMARY);
+            spawnParticles(event.eatenAt(), theme.food(), theme.foodHighlight(), 12);
+            spawnFloatingText(event.eatenAt(), "+1", theme.textPrimary());
             soundEffects.playEat();
         }
         if (event.ateGoldenFood() && event.eatenAt() != null) {
-            spawnParticles(event.eatenAt(), GOLDEN_COLOR, GOLDEN_HIGHLIGHT, 24);
-            spawnFloatingText(event.eatenAt(), "+" + SnakeGame.GOLDEN_FOOD_POINTS, RECORD_GOLD);
+            spawnParticles(event.eatenAt(), theme.golden(), theme.goldenHighlight(), 24);
+            spawnFloatingText(event.eatenAt(), "+" + SnakeGame.GOLDEN_FOOD_POINTS, theme.recordGold());
             soundEffects.playGoldenEat();
         }
         if (event.goldenSpawned()) {
@@ -188,6 +165,12 @@ public class GamePanel extends JPanel {
             repaint();
             return;
         }
+        if (keyCode == KeyEvent.VK_T) {
+            setTheme(theme.next());
+            soundEffects.playClick();
+            repaint();
+            return;
+        }
 
         switch (game.getState()) {
             case MENU -> handleMenuKey(keyCode);
@@ -199,11 +182,11 @@ public class GamePanel extends JPanel {
     private void handleMenuKey(int keyCode) {
         switch (keyCode) {
             case KeyEvent.VK_UP, KeyEvent.VK_W -> {
-                menuSelectedRow = (menuSelectedRow + 2) % 3;
+                menuSelectedRow = (menuSelectedRow + 3) % 4;
                 soundEffects.playClick();
             }
             case KeyEvent.VK_DOWN, KeyEvent.VK_S -> {
-                menuSelectedRow = (menuSelectedRow + 1) % 3;
+                menuSelectedRow = (menuSelectedRow + 1) % 4;
                 soundEffects.playClick();
             }
             case KeyEvent.VK_LEFT, KeyEvent.VK_A -> {
@@ -213,6 +196,9 @@ public class GamePanel extends JPanel {
                 } else if (menuSelectedRow == 1) {
                     game.setDifficulty(game.getDifficulty().previous());
                     soundEffects.playClick();
+                } else if (menuSelectedRow == 2) {
+                    setTheme(theme.previous());
+                    soundEffects.playClick();
                 }
             }
             case KeyEvent.VK_RIGHT, KeyEvent.VK_D -> {
@@ -221,6 +207,9 @@ public class GamePanel extends JPanel {
                     soundEffects.playClick();
                 } else if (menuSelectedRow == 1) {
                     game.setDifficulty(game.getDifficulty().next());
+                    soundEffects.playClick();
+                } else if (menuSelectedRow == 2) {
+                    setTheme(theme.next());
                     soundEffects.playClick();
                 }
             }
@@ -279,6 +268,7 @@ public class GamePanel extends JPanel {
         Point boardPoint = new Point(screenPoint.x, screenPoint.y - HUD_HEIGHT);
         boolean overClickable = MODE_ROW_RECT.contains(boardPoint)
                 || DIFF_ROW_RECT.contains(boardPoint)
+                || THEME_ROW_RECT.contains(boardPoint)
                 || PLAY_BTN_RECT.contains(boardPoint);
 
         playButtonHovered = PLAY_BTN_RECT.contains(boardPoint);
@@ -299,6 +289,11 @@ public class GamePanel extends JPanel {
         } else if (DIFF_ROW_RECT.contains(boardPoint)) {
             menuSelectedRow = 1;
             game.setDifficulty(game.getDifficulty().next());
+            soundEffects.playClick();
+            repaint();
+        } else if (THEME_ROW_RECT.contains(boardPoint)) {
+            menuSelectedRow = 2;
+            setTheme(theme.next());
             soundEffects.playClick();
             repaint();
         } else if (PLAY_BTN_RECT.contains(boardPoint)) {
@@ -375,6 +370,7 @@ public class GamePanel extends JPanel {
         drawHud(g2);
 
         g2.translate(0, HUD_HEIGHT);
+        drawBoardBackground(g2);
         drawGrid(g2);
         drawClassicWallIndicator(g2);
         drawFood(g2);
@@ -394,19 +390,19 @@ public class GamePanel extends JPanel {
     }
 
     private void drawHud(Graphics2D g2) {
-        g2.setColor(HUD_BG_COLOR);
+        g2.setColor(theme.hudBg());
         g2.fillRect(0, 0, BOARD_WIDTH, HUD_HEIGHT);
 
-        g2.setColor(HUD_BORDER_COLOR);
+        g2.setColor(theme.hudBorder());
         g2.drawLine(0, HUD_HEIGHT - 1, BOARD_WIDTH, HUD_HEIGHT - 1);
 
         // Puntaje (izquierda arriba) + Modo/Dificultad (izquierda abajo)
         g2.setFont(HUD_FONT);
-        g2.setColor(TEXT_PRIMARY);
+        g2.setColor(theme.textPrimary());
         g2.drawString("Puntaje: " + game.getScore(), 16, 24);
 
         g2.setFont(HUD_META_FONT);
-        g2.setColor(TEXT_MUTED);
+        g2.setColor(theme.textMuted());
         g2.drawString(game.getGameMode().label() + " · " + game.getDifficulty().label(), 16, 43);
 
         // Récord (centro)
@@ -414,24 +410,29 @@ public class GamePanel extends JPanel {
         FontMetrics fm = g2.getFontMetrics();
         String recordText = "Récord: " + game.getHighScore();
         int recordWidth = fm.stringWidth(recordText);
-        g2.setColor(game.isNewRecord() ? RECORD_GOLD : TEXT_PRIMARY);
+        g2.setColor(game.isNewRecord() ? theme.recordGold() : theme.textPrimary());
         g2.drawString(recordText, (BOARD_WIDTH - recordWidth) / 2, 33);
 
-        // Estado de sonido y pausa (derecha)
+        // Estado de sonido y atajos (derecha)
         g2.setFont(HUD_META_FONT);
         FontMetrics metaFm = g2.getFontMetrics();
 
         String soundLabel = soundEffects.isMuted() ? "M: Sonido OFF" : "M: Sonido ON";
-        g2.setColor(soundEffects.isMuted() ? SNAKE_DEAD_HEAD_COLOR : TEXT_MUTED);
+        g2.setColor(soundEffects.isMuted() ? theme.snakeDeadHead() : theme.textMuted());
         g2.drawString(soundLabel, BOARD_WIDTH - metaFm.stringWidth(soundLabel) - 16, 22);
 
-        String pauseLabel = game.isPaused() ? "Espacio: Reanudar" : "Espacio: Pausa";
-        g2.setColor(TEXT_MUTED);
-        g2.drawString(pauseLabel, BOARD_WIDTH - metaFm.stringWidth(pauseLabel) - 16, 42);
+        String controlsLabel = game.isPaused() ? "T: Tema · Espacio: Reanudar" : "T: Tema · Espacio: Pausa";
+        g2.setColor(theme.textMuted());
+        g2.drawString(controlsLabel, BOARD_WIDTH - metaFm.stringWidth(controlsLabel) - 16, 42);
+    }
+
+    private void drawBoardBackground(Graphics2D g2) {
+        g2.setColor(theme.bg());
+        g2.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
     }
 
     private void drawGrid(Graphics2D g2) {
-        g2.setColor(GRID_COLOR);
+        g2.setColor(theme.grid());
         for (int x = 0; x <= BOARD_WIDTH; x += TILE_SIZE) {
             g2.drawLine(x, 0, x, BOARD_HEIGHT);
         }
@@ -442,7 +443,7 @@ public class GamePanel extends JPanel {
 
     private void drawClassicWallIndicator(Graphics2D g2) {
         if (!game.getGameMode().wrapsWalls()) {
-            g2.setColor(CLASSIC_WALL_COLOR);
+            g2.setColor(theme.classicWall());
             g2.setStroke(new BasicStroke(3f));
             g2.drawRect(1, 1, BOARD_WIDTH - 3, BOARD_HEIGHT - 3);
             g2.setStroke(new BasicStroke(1f));
@@ -460,13 +461,13 @@ public class GamePanel extends JPanel {
         int px = food.x() * TILE_SIZE + (TILE_SIZE - size) / 2;
         int py = food.y() * TILE_SIZE + (TILE_SIZE - size) / 2 + 1;
 
-        g2.setColor(FOOD_COLOR);
+        g2.setColor(theme.food());
         g2.fillOval(px, py, size, size);
 
-        g2.setColor(FOOD_HIGHLIGHT);
+        g2.setColor(theme.foodHighlight());
         g2.fillOval(px + 4, py + 4, 5, 5);
 
-        g2.setColor(FOOD_LEAF_COLOR);
+        g2.setColor(theme.foodLeaf());
         g2.fillOval(px + size / 2 - 1, py - 3, 6, 4);
     }
 
@@ -486,14 +487,14 @@ public class GamePanel extends JPanel {
 
         // Halo dorado pulsante
         int glowSize = size + 10;
-        g2.setColor(GOLDEN_GLOW);
+        g2.setColor(theme.goldenGlow());
         g2.fillOval(cx - glowSize / 2, cy - glowSize / 2, glowSize, glowSize);
 
         // Manzana dorada
-        g2.setColor(GOLDEN_COLOR);
+        g2.setColor(theme.golden());
         g2.fillOval(px, py, size, size);
 
-        g2.setColor(GOLDEN_HIGHLIGHT);
+        g2.setColor(theme.goldenHighlight());
         g2.fillOval(px + 4, py + 4, 6, 6);
 
         // Barra de tiempo restante debajo de la manzana dorada
@@ -502,9 +503,9 @@ public class GamePanel extends JPanel {
         int barX = golden.x() * TILE_SIZE + 2;
         int barY = golden.y() * TILE_SIZE + TILE_SIZE - 3;
 
-        g2.setColor(new Color(15, 23, 42, 200));
+        g2.setColor(theme.hudBg());
         g2.fillRect(barX, barY, barW, 3);
-        g2.setColor(GOLDEN_COLOR);
+        g2.setColor(theme.golden());
         g2.fillRect(barX, barY, Math.max(1, Math.round(barW * ratio)), 3);
     }
 
@@ -518,12 +519,12 @@ public class GamePanel extends JPanel {
             int size = TILE_SIZE - 4;
 
             if (index == 0) {
-                g2.setColor(game.isGameOver() && !game.isWon() ? SNAKE_DEAD_HEAD_COLOR : SNAKE_HEAD_COLOR);
+                g2.setColor(game.isGameOver() && !game.isWon() ? theme.snakeDeadHead() : theme.snakeHead());
                 g2.fillRoundRect(px, py, size, size, 10, 10);
                 drawEyes(g2, px, py, size);
             } else {
                 float ratio = (float) index / length;
-                g2.setColor(blendColor(SNAKE_BODY_START, SNAKE_BODY_END, ratio));
+                g2.setColor(blendColor(theme.snakeBodyStart(), theme.snakeBodyEnd(), ratio));
                 g2.fillRoundRect(px, py, size, size, 8, 8);
             }
             index++;
@@ -531,7 +532,7 @@ public class GamePanel extends JPanel {
     }
 
     private void drawEyes(Graphics2D g2, int px, int py, int size) {
-        g2.setColor(EYE_COLOR);
+        g2.setColor(theme.eye());
         int eyeSize = 4;
         int offsetNear = 5;
         int offsetFar = size - offsetNear - eyeSize;
@@ -580,36 +581,37 @@ public class GamePanel extends JPanel {
     private void drawMenuOverlay(Graphics2D g2) {
         drawOverlayCard(g2, MENU_CARD_X, MENU_CARD_Y, MENU_CARD_W, MENU_CARD_H);
 
-        drawCenteredText(g2, "SNAKE", TITLE_FONT, SNAKE_HEAD_COLOR, MENU_CARD_Y + 52);
-        drawCenteredText(g2, "Elige modo y dificultad para empezar", HUD_META_FONT, TEXT_MUTED, MENU_CARD_Y + 76);
+        drawCenteredText(g2, "SNAKE", TITLE_FONT, theme.accent(), MENU_CARD_Y + 50);
+        drawCenteredText(g2, "Personaliza tu partida y presiona Jugar", HUD_META_FONT, theme.textMuted(), MENU_CARD_Y + 74);
 
-        drawMenuOptionRow(g2, MODE_ROW_RECT, "Modo", "<  " + game.getGameMode().label() + "  >", menuSelectedRow == 0);
-        drawMenuOptionRow(g2, DIFF_ROW_RECT, "Dificultad", "<  " + game.getDifficulty().label() + "  >", menuSelectedRow == 1);
+        drawMenuOptionRow(g2, MODE_ROW_RECT, "Modo", "<  " + game.getGameMode().label() + "  >", menuSelectedRow == 0, false);
+        drawMenuOptionRow(g2, DIFF_ROW_RECT, "Dificultad", "<  " + game.getDifficulty().label() + "  >", menuSelectedRow == 1, false);
+        drawMenuOptionRow(g2, THEME_ROW_RECT, "Tema", "<  " + theme.label() + "  >", menuSelectedRow == 2, true);
 
         // Botón JUGAR
-        boolean playHighlighted = playButtonHovered || menuSelectedRow == 2;
-        g2.setColor(playHighlighted ? BUTTON_GREEN_HOVER : BUTTON_GREEN);
+        boolean playHighlighted = playButtonHovered || menuSelectedRow == 3;
+        g2.setColor(playHighlighted ? theme.buttonHover() : theme.buttonBg());
         g2.fillRoundRect(PLAY_BTN_RECT.x, PLAY_BTN_RECT.y, PLAY_BTN_RECT.width, PLAY_BTN_RECT.height, 12, 12);
 
         g2.setFont(BUTTON_FONT);
-        g2.setColor(EYE_COLOR);
+        g2.setColor(theme.buttonText());
         FontMetrics btnFm = g2.getFontMetrics();
         String playText = "JUGAR";
         int btnTextX = PLAY_BTN_RECT.x + (PLAY_BTN_RECT.width - btnFm.stringWidth(playText)) / 2;
         int btnTextY = PLAY_BTN_RECT.y + (PLAY_BTN_RECT.height + btnFm.getAscent() - btnFm.getDescent()) / 2;
         g2.drawString(playText, btnTextX, btnTextY);
 
-        drawCenteredText(g2, "Flechas / Clic para elegir  •  Enter para jugar", HUD_META_FONT, TEXT_MUTED, MENU_CARD_Y + 290);
+        drawCenteredText(g2, "Flechas / Clic para elegir  •  Enter para jugar", HUD_META_FONT, theme.textMuted(), MENU_CARD_Y + 340);
     }
 
-    private void drawMenuOptionRow(Graphics2D g2, Rectangle rect, String label, String value, boolean selected) {
+    private void drawMenuOptionRow(Graphics2D g2, Rectangle rect, String label, String value, boolean selected, boolean showThemeSwatches) {
         if (selected) {
-            g2.setColor(ROW_SELECTED_BG);
+            g2.setColor(theme.rowSelectedBg());
             g2.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 10, 10);
-            g2.setColor(SNAKE_HEAD_COLOR);
+            g2.setColor(theme.accent());
             g2.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 10, 10);
         } else {
-            g2.setColor(new Color(30, 39, 53));
+            g2.setColor(theme.rowBg());
             g2.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 10, 10);
         }
 
@@ -617,26 +619,41 @@ public class GamePanel extends JPanel {
         FontMetrics fm = g2.getFontMetrics();
         int textY = rect.y + (rect.height + fm.getAscent() - fm.getDescent()) / 2;
 
-        g2.setColor(TEXT_MUTED);
+        g2.setColor(theme.textMuted());
         g2.drawString(label, rect.x + 16, textY);
+
+        if (showThemeSwatches) {
+            int swatchY = rect.y + (rect.height - 10) / 2;
+            int swatchX = rect.x + 70;
+            drawSwatch(g2, swatchX, swatchY, theme.bg());
+            drawSwatch(g2, swatchX + 14, swatchY, theme.snakeHead());
+            drawSwatch(g2, swatchX + 28, swatchY, theme.food());
+        }
 
         g2.setFont(MENU_VALUE_FONT);
         FontMetrics valFm = g2.getFontMetrics();
-        g2.setColor(selected ? SNAKE_HEAD_COLOR : TEXT_PRIMARY);
+        g2.setColor(selected ? theme.accent() : theme.textPrimary());
         g2.drawString(value, rect.x + rect.width - valFm.stringWidth(value) - 16, textY);
+    }
+
+    private void drawSwatch(Graphics2D g2, int x, int y, Color color) {
+        g2.setColor(color);
+        g2.fillOval(x, y, 10, 10);
+        g2.setColor(theme.overlayCardBorder());
+        g2.drawOval(x, y, 10, 10);
     }
 
     private void drawPauseOverlay(Graphics2D g2) {
         int cardW = 340;
-        int cardH = 148;
+        int cardH = 152;
         int cardX = (BOARD_WIDTH - cardW) / 2;
         int cardY = (BOARD_HEIGHT - cardH) / 2;
 
         drawOverlayCard(g2, cardX, cardY, cardW, cardH);
 
-        drawCenteredText(g2, "PAUSA", OVERLAY_TITLE_FONT, TEXT_PRIMARY, cardY + 54);
-        drawCenteredText(g2, "Espacio o P para continuar", OVERLAY_SUBTITLE_FONT, TEXT_MUTED, cardY + 92);
-        drawCenteredText(g2, "Esc para volver al menú", HUD_META_FONT, TEXT_MUTED, cardY + 122);
+        drawCenteredText(g2, "PAUSA", OVERLAY_TITLE_FONT, theme.textPrimary(), cardY + 52);
+        drawCenteredText(g2, "Espacio o P para continuar", OVERLAY_SUBTITLE_FONT, theme.textMuted(), cardY + 90);
+        drawCenteredText(g2, "T: Cambiar tema   •   Esc: Menú", HUD_META_FONT, theme.textMuted(), cardY + 122);
     }
 
     private void drawGameOverOverlay(Graphics2D g2) {
@@ -648,29 +665,29 @@ public class GamePanel extends JPanel {
         drawOverlayCard(g2, cardX, cardY, cardW, cardH);
 
         String title = game.isWon() ? "¡VICTORIA!" : "GAME OVER";
-        Color titleColor = game.isWon() ? SNAKE_HEAD_COLOR : SNAKE_DEAD_HEAD_COLOR;
+        Color titleColor = game.isWon() ? theme.accent() : theme.snakeDeadHead();
         drawCenteredText(g2, title, OVERLAY_TITLE_FONT, titleColor, cardY + 52);
 
         String scoreSummary = "Puntaje: " + game.getScore() + "   •   Récord: " + game.getHighScore();
-        drawCenteredText(g2, scoreSummary, OVERLAY_SUBTITLE_FONT, TEXT_PRIMARY, cardY + 90);
+        drawCenteredText(g2, scoreSummary, OVERLAY_SUBTITLE_FONT, theme.textPrimary(), cardY + 90);
 
         int hintY = cardY + 132;
         if (game.isNewRecord()) {
-            drawCenteredText(g2, "★ ¡NUEVO RÉCORD! ★", MENU_VALUE_FONT, RECORD_GOLD, cardY + 124);
+            drawCenteredText(g2, "★ ¡NUEVO RÉCORD! ★", MENU_VALUE_FONT, theme.recordGold(), cardY + 124);
             hintY = cardY + 160;
         }
 
-        drawCenteredText(g2, "Enter / R: Jugar de nuevo   •   Esc: Menú", HUD_META_FONT, TEXT_MUTED, hintY);
+        drawCenteredText(g2, "Enter / R: Jugar de nuevo   •   Esc: Menú", HUD_META_FONT, theme.textMuted(), hintY);
     }
 
     private void drawOverlayCard(Graphics2D g2, int x, int y, int width, int height) {
-        g2.setColor(OVERLAY_BACKDROP);
+        g2.setColor(theme.overlayBackdrop());
         g2.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
-        g2.setColor(OVERLAY_CARD_BG);
+        g2.setColor(theme.overlayCardBg());
         g2.fillRoundRect(x, y, width, height, 18, 18);
 
-        g2.setColor(OVERLAY_CARD_BORDER);
+        g2.setColor(theme.overlayCardBorder());
         g2.drawRoundRect(x, y, width, height, 18, 18);
     }
 
