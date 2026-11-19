@@ -1,8 +1,11 @@
-# Archivos compilados de Java
+# Archivos compilados y paquetes distribuibles
 out/
 bin/
+dist/
 *.class
 *.jar
+*.rar
+*.zip
 
 # Archivos de IDEs
 .idea/

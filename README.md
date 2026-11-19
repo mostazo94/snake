@@ -44,6 +44,7 @@ snake-java/
 │   └── GamePanel.java         # UI en Swing a 60 FPS, menú, HUD, temas, partículas y controles
 ├── test/com/snake/
 │   └── SnakeGameTest.java     # 12 pruebas unitarias de la lógica, temas y persistencia
+├── build-dist.ps1             # Script para generar el paquete portable (.rar) con JRE incluido
 ├── .gitignore
 └── README.md
 ```
@@ -74,3 +75,14 @@ java -cp out com.snake.Main
 javac -encoding UTF-8 -d out src/com/snake/*.java test/com/snake/SnakeGameTest.java
 java -cp out com.snake.SnakeGameTest
 ```
+
+## Generar paquete portable para Windows (`.rar`)
+
+Si quieres generar un archivo comprimido listo para descomprimir y jugar con doble clic (sin necesitar Java instalado en la PC destino):
+
+```powershell
+.\build-dist.ps1
+```
+
+Esto crea `dist/Snake-Java-Windows.rar` con el `.jar` compilado, un entorno mínimo de Java generado con `jlink` y el lanzador `Jugar Snake.bat`.
+
